@@ -169,8 +169,12 @@
   };
 
   // MAPPER: property.ybsId → [data-ybs-button] (없으면 숨김)
+  //                        → [data-ybs-badge] 예약하기 위 「특가」 배지 (운영 요청: YBS 가 켜진 숙소만)
   HeaderFooterMapper.prototype.mapYbs = function () {
     var ybsId = this.getProperty().ybsId;
+    document.querySelectorAll('[data-ybs-badge]').forEach(function (el) {
+      el.style.display = ybsId ? '' : 'none';
+    });
     document.querySelectorAll('[data-ybs-button]').forEach(function (el) {
       if (!ybsId) {
         el.style.display = 'none';
@@ -270,7 +274,7 @@
   // MAPPER: roomtypes[].name → [data-rooms-submenu] (data-room-menu-link 앵커 뒤에 li 동적 생성)
   HeaderFooterMapper.prototype.mapRoomMenu = function () {
     var self = this;
-    var roomItems = this.getRoomMenuItems(this.getRoomtypes(), function (rt) { return (rt && rt.name) || ''; });
+    var roomItems = this.getRoomMenuItems(this.getRoomtypes(), function (rt) { return self.getRoomtypeName(rt); });
     document.querySelectorAll('[data-rooms-submenu]').forEach(function (container) {
       container.querySelectorAll('[data-generated="room"]').forEach(function (li) { li.remove(); });
       roomItems.forEach(function (item) {
@@ -281,6 +285,8 @@
         var a = document.createElement('a');
         a.href = self.getRoomMenuLink(item);
         a.textContent = name;
+        // 긴 객실명은 CSS 로 한 줄 말줄임한다 — 전체 이름은 툴팁으로 보여준다
+        a.title = name;
         li.appendChild(a);
         container.appendChild(li);
       });
@@ -303,11 +309,22 @@
   };
 
   // MAPPER: pages.layoutMap / nearbyAttractions enabled → 메뉴 표시/숨김
+  //
+  // 미리보기가 꺼지면 "미리보기" li 를 숨기고, 대메뉴 ROOMS([data-rooms-link])는
+  // 첫 번째 객실 상세로 보낸다 — 그대로 두면 layout-map.html 이 404 로 튕긴다.
+  // 판정은 layout-map.html 의 404 기준과 같은 isLayoutMapEnabled() 를 쓴다.
   HeaderFooterMapper.prototype.mapPageToggles = function () {
-    var layoutMapEnabled = this.isPageEnabled('layoutMap');
+    var layoutMapEnabled = this.isLayoutMapEnabled();
     document.querySelectorAll('[data-menu-id="layout-map"]').forEach(function (el) {
       el.style.display = layoutMapEnabled ? '' : 'none';
     });
+
+    var roomsLink = this.getRoomsEntryLink(this.getRoomtypes());
+    if (roomsLink) {
+      document.querySelectorAll('[data-rooms-link]').forEach(function (el) {
+        el.setAttribute('href', roomsLink);
+      });
+    }
 
     var nearbyEnabled = this.isPageEnabled('nearbyAttractions');
     document.querySelectorAll('[data-travel-menu]').forEach(function (el) {
@@ -360,8 +377,30 @@
     });
   };
 
+  // MAPPER: customFields.footer.ruralStayMark → [data-footer-rural-stay-mark] (푸터 메뉴 아래, 전화번호 위)
+  // 농어촌민박사업자 이미지가 있을 때만 노출하고, 없으면 숨겨 기존 푸터와 같다.
+  // 프리뷰는 같은 페이지에서 다시 매핑하므로 매번 표시 상태를 되돌린다.
+  HeaderFooterMapper.prototype.mapFooterRuralStayMark = function () {
+    var footer = this.getCustomFields().footer || {};
+    var mark = footer.ruralStayMark;
+    var markUrl = mark && mark.url ? String(mark.url) : '';
+
+    document.querySelectorAll('[data-footer-rural-stay-mark-wrap]').forEach(function (wrap) {
+      wrap.style.display = markUrl ? '' : 'none';
+    });
+    document.querySelectorAll('[data-footer-rural-stay-mark]').forEach(function (img) {
+      if (!markUrl) {
+        img.removeAttribute('src');
+        return;
+      }
+      img.src = markUrl;
+      img.alt = (mark.description && String(mark.description).trim()) || '농어촌민박사업자';
+    });
+  };
+
   HeaderFooterMapper.prototype.mapFooter = function () {
     this.mapCopyright();
+    this.mapFooterRuralStayMark();
     var prop = this.getProperty();
     var biz = prop.businessInfo || {};
     var phones = this.toPhoneList(prop.contactPhone);
@@ -382,17 +421,10 @@
     // 전화번호: 배열에 담긴 번호를 전부 줄바꿈해 노출 (각각 tel: 링크)
     this.renderFooterPhones(phones);
 
-    // 푸터 ROOMS 링크: layoutMap(미리보기) 활성 시 layout-map.html, 아니면 첫 번째 객실 room.html
-    // (헤더 ROOMS 메뉴의 미리보기 노출 로직 isPageEnabled('layoutMap')과 일관)
-    var roomLink;
-    if (this.isPageEnabled('layoutMap')) {
-      roomLink = 'layout-map.html';
-    } else {
-      var firstRoom = this.getRoomtypes().filter(function (rt) {
-        return rt.name && rt.name.trim();
-      })[0];
-      roomLink = firstRoom ? 'room.html?room_id=' + firstRoom.id : 'room.html';
-    }
+    // 푸터 ROOMS 링크: 헤더 대메뉴 ROOMS 와 같은 곳(getRoomsEntryLink)
+    //   미리보기 켜짐 → layout-map.html / 꺼짐 → 첫 번째 객실 상세
+    // 객실이 하나도 없으면 room.html (room.html 은 room_id 가 없으면 첫 객실을 그린다)
+    var roomLink = this.getRoomsEntryLink(this.getRoomtypes()) || 'room.html';
     document.querySelectorAll('[data-footer-room-link]').forEach(function (el) {
       el.setAttribute('href', roomLink);
     });
