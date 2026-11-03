@@ -1,7 +1,7 @@
 {
   "metadata": {
-    "version": "1.6.0",
-    "generatedAt": "2026-11-03T07:16:21.981968841Z",
+    "version": "1.7.0",
+    "generatedAt": "2026-11-03T07:16:42.841158221Z",
     "templateType": "trip_d",
     "propertyId": "b3ea11fa-30dc-45eb-ac2a-6ee586a9932c",
     "homepageId": "ae87a4b3-b018-4ab9-a090-e0230366278e"
@@ -1463,9 +1463,9 @@
       },
       "theme": {
         "font": {
+          "koMain": null,
           "koSub": null,
-          "enMain": null,
-          "koMain": null
+          "enMain": null
         },
         "color": null
       },
